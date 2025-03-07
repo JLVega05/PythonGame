@@ -87,6 +87,37 @@ class Player(pygame.sprite.Sprite):
         bullet_group.add(bullet)
         all_sprites.add(bullet)
 
+class ChasingObstacle(pygame.sprite.Sprite):
+    """Obstáculo que persigue al jugador."""
+
+    def __init__(self):
+        super().__init__()
+        self.image = pygame.Surface((40, 40))
+        self.image.fill(RED)
+        self.rect = self.image.get_rect()
+        # Posición inicial fuera de la pantalla por la derecha
+        self.rect.x = WIDTH + random.randint(50, 100)
+        self.rect.y = random.randint(0, HEIGHT - 40)
+        self.speed = random.randint(3 + difficulty_level, 7 + difficulty_level)
+
+    def update(self):
+        """El obstáculo persigue al jugador moviéndose hacia su posición."""
+        # Obtener la posición del jugador
+        player_pos = player.rect.center
+        # Calcular la dirección hacia el jugador
+        dx = player_pos[0] - self.rect.x
+        dy = player_pos[1] - self.rect.y
+        distance = (dx ** 2 + dy ** 2) ** 0.5
+        # Normalizar la dirección
+        dx /= distance
+        dy /= distance
+        # Mover al obstáculo hacia el jugador
+        self.rect.x += dx * self.speed
+        self.rect.y += dy * self.speed
+
+        # Si el obstáculo sale de la pantalla, se elimina
+        if self.rect.right < 0 or self.rect.left > WIDTH or self.rect.bottom < 0 or self.rect.top > HEIGHT:
+            self.kill()
 
 class Obstacle(pygame.sprite.Sprite):
     """Classe per als obstacles (enemics)."""
@@ -123,6 +154,37 @@ class Obstacle(pygame.sprite.Sprite):
             global score
             score += 5  # Puntuació per eliminar l'enemic
 
+class ChasingObstacle(pygame.sprite.Sprite):
+    """Obstáculo que persigue al jugador."""
+
+    def __init__(self):
+        super().__init__()
+        self.image = pygame.Surface((40, 40))
+        self.image.fill(RED)
+        self.rect = self.image.get_rect()
+        # Posición inicial fuera de la pantalla por la derecha
+        self.rect.x = WIDTH + random.randint(50, 100)
+        self.rect.y = random.randint(0, HEIGHT - 40)
+        self.speed = random.randint(3 + difficulty_level, 7 + difficulty_level)
+
+    def update(self):
+        """El obstáculo persigue al jugador moviéndose hacia su posición."""
+        # Obtener la posición del jugador
+        player_pos = player.rect.center
+        # Calcular la dirección hacia el jugador
+        dx = player_pos[0] - self.rect.x
+        dy = player_pos[1] - self.rect.y
+        distance = (dx ** 2 + dy ** 2) ** 0.5
+        # Normalizar la dirección
+        dx /= distance
+        dy /= distance
+        # Mover al obstáculo hacia el jugador
+        self.rect.x += dx * self.speed
+        self.rect.y += dy * self.speed
+
+        # Si el obstáculo sale de la pantalla, se elimina
+        if self.rect.right < 0 or self.rect.left > WIDTH or self.rect.bottom < 0 or self.rect.top > HEIGHT:
+            self.kill()
 
 class Bullet(pygame.sprite.Sprite):
     """Classe per a les bales disparades pel jugador."""
@@ -132,14 +194,15 @@ class Bullet(pygame.sprite.Sprite):
         self.image = pygame.Surface((5, 10))
         self.image.fill(BLACK)
         self.rect = self.image.get_rect()
-        self.rect.center = (x, y)
+        self.rect.center = (x+20, y+20)
         self.speed = 7
 
     def update(self):
-        """Actualitza la posició de la bala (la mou cap amunt)."""
-        self.rect.y -= self.speed
-        if self.rect.bottom < 0:
-            self.kill()  # Elimina la bala si surt de la pantalla
+        """Actualitza la posició de la bala (la mou cap a la dreta)."""
+        self.rect.x += self.speed  # Movemos la bala a la derecha
+        if self.rect.left > WIDTH:  # Si sale por el borde derecho, la eliminamos
+            self.kill()
+
 
 
 # ========================
@@ -187,7 +250,7 @@ def show_menu():
 # ========================
 
 def game_loop():
-    """Executa el bucle principal de la partida."""
+    """Ejecuta el bucle principal de la partida."""
     global difficulty_level, last_difficulty_update_time, spawn_interval, lives
     new_game()
     game_state = "playing"
@@ -199,14 +262,18 @@ def game_loop():
                 pygame.quit()
                 sys.exit()
             elif event.type == ADD_OBSTACLE:
-                obstacle = Obstacle()
+                # Decidir aleatoriamente si el obstáculo será un "chasing" o uno normal
+                if random.choice([True, False]):
+                    obstacle = ChasingObstacle()  # Obstáculo que persigue al jugador
+                else:
+                    obstacle = Obstacle()  # Obstáculo normal
                 all_sprites.add(obstacle)
                 obstacles.add(obstacle)
             elif event.type == pygame.KEYDOWN:
                 if event.key == pygame.K_SPACE:
                     player.shoot()  # Disparar bala
 
-        # Incrementar la dificultat cada 15 segons
+        # Incrementar la dificultad cada 15 segundos
         current_time = pygame.time.get_ticks()
         if current_time - last_difficulty_update_time >= 15000:
             difficulty_level += 1
@@ -214,33 +281,33 @@ def game_loop():
             spawn_interval = max(500, 1500 - difficulty_level * 100)
             pygame.time.set_timer(ADD_OBSTACLE, spawn_interval)
 
-        # Actualitzar els sprites
+        # Actualizar los sprites
         all_sprites.update()
 
-        # Comprovar col·lisions entre bales i obstacles
+        # Comprobar colisiones entre balas y obstáculos
         for bullet in bullet_group:
             hit_obstacles = pygame.sprite.spritecollide(bullet, obstacles, False)
             for obstacle in hit_obstacles:
                 obstacle.hit()
-                bullet.kill()  # Eliminar la bala després de col·lidir
+                bullet.kill()  # Eliminar la bala después de colisionar
 
-        # Comprovar si el jugador ha col·lisionat amb un obstacle
+        # Comprobar si el jugador ha colisionado con un obstáculo
         if pygame.sprite.spritecollideany(player, obstacles):
             lives -= 1
             if lives > 0:
-                # Reinicialitzar la posició del jugador i esborrar els obstacles
+                # Reinicializar la posición del jugador y borrar los obstáculos
                 player.rect.center = (100, HEIGHT // 2)
                 for obs in obstacles:
                     obs.kill()
             else:
                 game_state = "game_over"
 
-        # Dibuixar la escena
+        # Dibujar la escena
         screen.fill(WHITE)
         all_sprites.draw(screen)
-        score_text = font.render("Puntuació: " + str(score), True, BLACK)
-        difficulty_text = font.render("Dificultat: " + str(difficulty_level), True, BLACK)
-        lives_text = font.render("Vides: " + str(lives), True, BLACK)
+        score_text = font.render("Puntuación: " + str(score), True, BLACK)
+        difficulty_text = font.render("Dificultad: " + str(difficulty_level), True, BLACK)
+        lives_text = font.render("Vidas: " + str(lives), True, BLACK)
         screen.blit(score_text, (10, 10))
         screen.blit(difficulty_text, (10, 40))
         screen.blit(lives_text, (10, 70))
